@@ -53,7 +53,7 @@ func (point *User) Offline(){
 }
 
 func (point *User) sendMsg(msg string){
-	point.Channel <- msg
+	point.connect.Write([]byte(msg + "\n"))
 }
 
 func (point *User) DoMessage(msg string){

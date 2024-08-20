@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -46,6 +47,8 @@ func (server_poit *Server) Handler(connect net.Conn) {
 
 	user.Online()
 
+	isLive := make(chan bool)
+
 	go func ()  {
 		buf := make([]byte,4096)
 		for{
@@ -61,8 +64,25 @@ func (server_poit *Server) Handler(connect net.Conn) {
 			msg := string(buf[:n - 1])
 
 			user.DoMessage(msg)
+
+			isLive <- true
 		}
 	}()
+
+	for{
+		select{
+		case <-isLive:
+		case <-time.After(10*time.Second):
+			user.sendMsg("超时下线")
+			server_poit.mapLock.Lock()
+			delete(server_poit.OnlineMap,user.Name)
+			server_poit.mapLock.Unlock()
+			close(user.Channel)
+			connect.Close()
+			return
+		}
+	}
+
 }
 
 func (server_poit *Server) Start() {
