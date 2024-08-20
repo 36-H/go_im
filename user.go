@@ -1,6 +1,8 @@
 package main
 
-import "net"
+import (
+	"net"
+)
 
 type User struct {
 	Name    string
@@ -50,6 +52,21 @@ func (point *User) Offline(){
 	point.server.BroadCast(point, "已下线")
 }
 
+func (point *User) sendMsg(msg string){
+	point.Channel <- msg
+}
+
 func (point *User) DoMessage(msg string){
-	point.server.BroadCast(point,msg)
+	if msg == "/who"{
+		onlineMsg := "=========在线用户==========\n";
+		point.server.mapLock.RLock()
+		for _,user := range point.server.OnlineMap {
+			onlineMsg += "[" +user.Addr + "] " + user.Name + "\n" 
+		}
+		point.server.mapLock.RUnlock()
+		onlineMsg += "==========================";
+		point.sendMsg(onlineMsg)
+	}else{
+		point.server.BroadCast(point, msg)
+	}
 }
