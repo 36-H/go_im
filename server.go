@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"sync"
 )
@@ -41,14 +42,31 @@ func (server_poit *Server) BroadCast(user *User, msg string) {
 }
 
 func (server_poit *Server) Handler(connect net.Conn) {
-	User := NewUser(connect)
+	user := NewUser(connect)
 
 	server_poit.mapLock.Lock()
-	server_poit.OnlineMap[User.Name] = User
+	server_poit.OnlineMap[user.Name] = user
 	defer server_poit.mapLock.Unlock()
 
-	server_poit.BroadCast(User, "已上线")
+	server_poit.BroadCast(user, "已上线")
 
+	go func ()  {
+		buf := make([]byte,4096)
+		for{
+			n, err := connect.Read(buf)
+			if n == 0 {
+				server_poit.BroadCast(user,"下线")
+				return 
+			}
+			if err != nil && err != io.EOF {
+				fmt.Printf("Connect Read Err: %v\n", err)
+				return
+			}
+			msg := string(buf[:n - 1])
+
+			server_poit.BroadCast(user,msg)
+		}
+	}()
 }
 
 func (server_poit *Server) Start() {
