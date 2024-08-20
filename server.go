@@ -42,20 +42,16 @@ func (server_poit *Server) BroadCast(user *User, msg string) {
 }
 
 func (server_poit *Server) Handler(connect net.Conn) {
-	user := NewUser(connect)
+	user := NewUser(connect,server_poit)
 
-	server_poit.mapLock.Lock()
-	server_poit.OnlineMap[user.Name] = user
-	defer server_poit.mapLock.Unlock()
-
-	server_poit.BroadCast(user, "已上线")
+	user.Online()
 
 	go func ()  {
 		buf := make([]byte,4096)
 		for{
 			n, err := connect.Read(buf)
 			if n == 0 {
-				server_poit.BroadCast(user,"下线")
+				user.Offline()
 				return 
 			}
 			if err != nil && err != io.EOF {
@@ -64,7 +60,7 @@ func (server_poit *Server) Handler(connect net.Conn) {
 			}
 			msg := string(buf[:n - 1])
 
-			server_poit.BroadCast(user,msg)
+			user.DoMessage(msg)
 		}
 	}()
 }
