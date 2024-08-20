@@ -66,7 +66,22 @@ func (point *User) DoMessage(msg string){
 		point.server.mapLock.RUnlock()
 		onlineMsg += "==========================";
 		point.sendMsg(onlineMsg)
+	}else if len(msg) > 7 && msg[:8] == "/rename|" {
+		newName := msg[8:]
+		point.server.mapLock.Lock()
+		_,ok := point.server.OnlineMap[newName]
+		if ok {
+			point.sendMsg("当前用户名已被使用\n")
+			return
+		} else{
+			delete(point.server.OnlineMap,point.Name)
+			point.Name = newName
+			point.server.OnlineMap[point.Name] = point
+			point.sendMsg("用户名修改成功,当前用户名为:" + point.Name + "\n")
+		}
+		defer point.server.mapLock.Unlock()
 	}else{
 		point.server.BroadCast(point, msg)
 	}
 }
+
