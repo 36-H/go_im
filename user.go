@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"strings"
 )
 
 type User struct {
@@ -10,6 +11,7 @@ type User struct {
 	Channel chan string
 	connect net.Conn
 	server	*Server
+	IsLive chan bool
 }
 
 func NewUser(connect net.Conn,server *Server) *User {
@@ -21,6 +23,7 @@ func NewUser(connect net.Conn,server *Server) *User {
 		Channel: make(chan string),
 		connect: connect,
 		server: server,
+		IsLive: make(chan bool),
 	}
 
 	go user.ListenMessage()
@@ -31,7 +34,7 @@ func NewUser(connect net.Conn,server *Server) *User {
 func (point *User) ListenMessage() {
 	for {
 		msg := <-point.Channel
-
+		point.IsLive <- true
 		point.connect.Write([]byte(msg + "\n"))
 	}
 }
@@ -53,6 +56,7 @@ func (point *User) Offline(){
 }
 
 func (point *User) sendMsg(msg string){
+	point.IsLive <- true
 	point.connect.Write([]byte(msg + "\n"))
 }
 
@@ -77,9 +81,26 @@ func (point *User) DoMessage(msg string){
 			delete(point.server.OnlineMap,point.Name)
 			point.Name = newName
 			point.server.OnlineMap[point.Name] = point
-			point.sendMsg("用户名修改成功,当前用户名为:" + point.Name + "\n")
+			point.sendMsg("用户名修改成功,当前用户名为:" + point.Name)
 		}
 		defer point.server.mapLock.Unlock()
+	}else if len(msg) > 4 && msg[:4] == "/to|"{
+		remoteName := strings.Split(msg,"|")[1]
+		if remoteName == ""{
+			point.sendMsg("消息格式不正确，请使用\"/to|张三|信息\"格式.")
+			return
+		}
+		remoteUser,ok:=point.server.OnlineMap[remoteName]
+		if !ok {
+			point.sendMsg("用户不存在")
+			return
+		}
+		content :=  strings.Split(msg,"|")[2]
+		if content == "" {
+			point.sendMsg("无有效信息内容，请重新发送")
+			return
+		}
+		remoteUser.sendMsg(point.Name + "对您说：" + content)
 	}else{
 		point.server.BroadCast(point, msg)
 	}

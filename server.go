@@ -43,39 +43,37 @@ func (server_poit *Server) BroadCast(user *User, msg string) {
 }
 
 func (server_poit *Server) Handler(connect net.Conn) {
-	user := NewUser(connect,server_poit)
+	user := NewUser(connect, server_poit)
 
 	user.Online()
 
-	isLive := make(chan bool)
-
-	go func ()  {
-		buf := make([]byte,4096)
-		for{
+	go func() {
+		buf := make([]byte, 4096)
+		for {
 			n, err := connect.Read(buf)
 			if n == 0 {
 				user.Offline()
-				return 
+				return
 			}
 			if err != nil && err != io.EOF {
 				fmt.Printf("Connect Read Err: %v\n", err)
 				return
 			}
-			msg := string(buf[:n - 1])
+			msg := string(buf[:n-1])
 
 			user.DoMessage(msg)
 
-			isLive <- true
+			user.IsLive <- true
 		}
 	}()
 
-	for{
-		select{
-		case <-isLive:
-		case <-time.After(10*time.Second):
+	for {
+		select {
+		case <-user.IsLive:
+		case <-time.After(30 * time.Second):
 			user.sendMsg("超时下线")
 			server_poit.mapLock.Lock()
-			delete(server_poit.OnlineMap,user.Name)
+			delete(server_poit.OnlineMap, user.Name)
 			server_poit.mapLock.Unlock()
 			close(user.Channel)
 			connect.Close()
